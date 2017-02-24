@@ -1,27 +1,33 @@
 package main
 
 import (
-"log"
-"encoding/hex"
-"github.com/tarm/serial"
+	"bufio"
+	"encoding/hex"
+	"log"
+	"time"
+
+	"github.com/tarm/serial"
 )
 
 func main() {
-	c := &serial.Config{Name: "/dev/tty.IBC96342-01001-Bluetoot", Baud: 115200}
+	c := &serial.Config{Name: "/dev/tty.IBC96342-01001-Bluetoot", Baud: 57600, ReadTimeout: time.Second * 5}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		log.Fatal(err)
 	}
-	h, err := hex.DecodeString("011e001f00")
-	n, err := s.Write(h)
+	// Requête lire toutes les données
+	h, err := hex.DecodeString("011e001F00")
+	_, err = s.Write(h)
 	if err != nil {
 		log.Fatal(err)
 	}
+	// Reads exactly 17 bytes
+	reader := bufio.NewReader(s)
+	reply, err := reader.Peek(32)
+	if err != nil {
+		panic(err)
+	}
+	log.Println("Ouverture de la vanne (%)", reply[9])
+	log.Println("Couple subi (%)", reply[8])
 
-	buf := make([]byte, 128)
-	n, err = s.Read(buf)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Printf("%q", buf[:n])
 }
