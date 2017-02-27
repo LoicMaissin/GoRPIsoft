@@ -10,11 +10,19 @@ import (
 )
 
 func main() {
-	c := &serial.Config{Name: "/dev/tty.IBC96342-01001-Bluetoot", Baud: 57600, ReadTimeout: time.Second * 5}
+	c := &serial.Config{Name: "/dev/tty.IBC96342-01001-Bluetoot", Baud: 115200, ReadTimeout: time.Second * 5}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		log.Fatal(err)
 	}
+	for count := 0; count < 100; count++ {
+		time.Sleep(time.Second)
+		getAll(s)
+	}
+
+}
+
+func getAll(s *serial.Port) {
 	// Requête lire toutes les données
 	h, err := hex.DecodeString("011e001F00")
 	_, err = s.Write(h)
