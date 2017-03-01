@@ -1,4 +1,4 @@
-package main //package main //package main
+package main
 
 import (
 	"bufio"
@@ -12,9 +12,7 @@ import (
 )
 
 const (
-	myDB     = "test"
-	username = os.Getenv("INFLUX_USER")
-	password = os.Getenv("INFLUX_PSSWD")
+	myDB = "test"
 )
 
 func main() {
@@ -51,8 +49,8 @@ func writeDB(d []byte) {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://localhost:8086",
-		Username:           username,
-		Password:           password,
+		Username:           os.Getenv("INFLUX_USER"),
+		Password:           os.Getenv("INFLUX_PSSWD"),
 		InsecureSkipVerify: true,
 	})
 
