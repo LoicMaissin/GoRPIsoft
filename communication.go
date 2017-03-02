@@ -36,14 +36,13 @@ func getAll(s *serial.Port) []byte {
 	if err != nil {
 		log.Fatal(err)
 	}
-	// Reads exactly 17 bytes
+	// Reads exactly 38 bytes
 	reader := bufio.NewReader(s)
 	reply, err := reader.Peek(38)
 	if err != nil {
 		panic(err)
 	}
-	//	log.Println(reply)
-	//	log.Println("Couple subi (%)", reply[8])
+	fmt.Println(reply)
 	return reply
 }
 
@@ -75,7 +74,7 @@ func writeDB(d []byte) {
 	// Create a point and add to batch
 	tags := map[string]string{"actuator": "0"}
 	fields := actuatorInfo(d)
-	pt, err := client.NewPoint("Numerics", tags, fields, time.Now())
+	pt, err := client.NewPoint("measures", tags, fields, time.Now())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -97,7 +96,7 @@ func addBytes(v []byte) int {
 	// The number equal to v concatenated, with v[0] MSB
 	res := 0
 	for _, x := range v {
-		res = res<<4 + int(x)
+		res = res<<8 + int(x)
 	}
 	return res
 }
@@ -159,9 +158,9 @@ func actuatorInfo(response []byte) map[string]interface{} {
 		"startsLast12h":         addBytes(response[16:18]),
 		"totalStarts":           addBytes(response[18:22]),
 		"totalRunningTime":      addBytes(response[22:26]),
-		"partialStarts":         addBytes(response[27:31]),
-		"partialRunningTime":    addBytes(response[31:35]),
-		"actPosition(per mil)":  addBytes(response[35:39]),
+		"partialStarts":         addBytes(response[26:30]),
+		"partialRunningTime":    addBytes(response[30:34]),
+		"actPosition(per mil)":  addBytes(response[34:36]),
 	}
 	return fields
 }
