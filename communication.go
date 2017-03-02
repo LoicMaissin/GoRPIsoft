@@ -74,11 +74,7 @@ func writeDB(d []byte) {
 
 	// Create a point and add to batch
 	tags := map[string]string{"actuator": "0"}
-	fields := map[string]interface{}{
-		"currentTorque": d[8],
-		"Opening":       d[9],
-	}
-
+	fields := actuatorInfo(d)
 	pt, err := client.NewPoint("Numerics", tags, fields, time.Now())
 	if err != nil {
 		log.Fatal(err)
