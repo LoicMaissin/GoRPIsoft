@@ -3,7 +3,6 @@ package main
 import (
 	"bufio"
 	"encoding/hex"
-	"fmt"
 	"log"
 	"os"
 	"time"
@@ -17,19 +16,29 @@ const (
 )
 
 func main() {
-	c := &serial.Config{Name: "/dev/tty.IBC96342-01001-Bluetoot", Baud: 115200, ReadTimeout: time.Second * 5}
+
+	channel := make(chan [38]byte)
+
+	// Launch the Database client
+	go writeDB(channel)
+
+	c := &serial.Config{
+		Name:        "/dev/tty.IBC96342-01001-Bluetoot",
+		Baud:        115200,
+		ReadTimeout: time.Second * 5}
 	s, err := serial.OpenPort(c)
 	if err != nil {
 		log.Fatal(err)
 	}
-	for count := 0; count < 1; count++ {
-		//	time.Sleep(time.Second / 15)
-		x := actuatorInfo(getAll(s))
-		fmt.Print(x)
+	for count := 0; count < 1000; count++ {
+		channel <- getAll(s)
 	}
+	close(channel)
+	time.Sleep(time.Second * 3)
+
 }
 
-func getAll(s *serial.Port) []byte {
+func getAll(s *serial.Port) [38]byte {
 	// Requête lire toutes les données
 	h, _ := hex.DecodeString("011e001F00")
 	_, err := s.Write(h)
@@ -42,11 +51,12 @@ func getAll(s *serial.Port) []byte {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(reply)
-	return reply
+	var res [38]byte
+	copy(res[:], reply)
+	return res
 }
 
-func writeDB(d []byte) {
+func writeDB(channel chan [38]byte) {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://localhost:8086",
@@ -61,7 +71,6 @@ func writeDB(d []byte) {
 		println("Connected :D")
 	}
 	defer c.Close() //ensure c is closed after function return
-
 	// Create a new point batch
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  myDB,
@@ -73,16 +82,57 @@ func writeDB(d []byte) {
 
 	// Create a point and add to batch
 	tags := map[string]string{"actuator": "0"}
-	fields := actuatorInfo(d)
-	pt, err := client.NewPoint("measures", tags, fields, time.Now())
-	if err != nil {
-		log.Fatal(err)
+	last := [38]byte{}
+	lastTime := time.Now()
+	count := 0
+	for response := range channel {
+		if last == response {
+			lastTime = time.Now()
+		} else {
+			fields := actuatorInfo(last)
+			pt, errPt := client.NewPoint("measures", tags, fields, lastTime)
+			if errPt != nil {
+				log.Fatal(errPt)
+			}
+			bp.AddPoint(pt)
+
+			fields = actuatorInfo(response)
+			pt, errPt = client.NewPoint("measures", tags, fields, time.Now())
+			if errPt != nil {
+				log.Fatal(errPt)
+			}
+			bp.AddPoint(pt)
+			log.Println("Wrote a point!")
+
+			last = response
+			count++
+		}
+		if count == 200 {
+			// Write the batch
+			if err = c.Write(bp); err != nil {
+				log.Fatal(err)
+			}
+			log.Println("Sent the batch!")
+			bp, err = client.NewBatchPoints(client.BatchPointsConfig{
+				Database:  myDB,
+				Precision: "ms",
+			})
+			if err != nil {
+				log.Fatal(err)
+			}
+		}
+	}
+	fields := actuatorInfo(last)
+	pt, errPt := client.NewPoint("measures", tags, fields, lastTime)
+	if errPt != nil {
+		log.Fatal(errPt)
 	}
 	bp.AddPoint(pt)
 	// Write the batch
 	if err := c.Write(bp); err != nil {
 		log.Fatal(err)
 	}
+	log.Println("Sent the batch!")
 }
 
 func nthBit(x byte, n uint) bool {
@@ -101,7 +151,7 @@ func addBytes(v []byte) int {
 	return res
 }
 
-func actuatorInfo(response []byte) map[string]interface{} {
+func actuatorInfo(response [38]byte) map[string]interface{} {
 	fields := map[string]interface{}{
 		"isOpened":                          nthBit(response[5], 0),
 		"isClosed":                          nthBit(response[5], 1),
