@@ -17,10 +17,12 @@ const (
 
 func main() {
 
-	channel := make(chan [38]byte)
+	channelResponse := make(chan [38]byte)
+	channelBatches := make(chan client.BatchPoints)
 
 	// Launch the Database client
-	go writeDB(channel)
+	go writeDB(channelResponse, channelBatches)
+	go sendDB(channelBatches)
 
 	c := &serial.Config{
 		Name:        "/dev/tty.IBC96342-01001-Bluetoot",
@@ -28,13 +30,15 @@ func main() {
 		ReadTimeout: time.Second * 5}
 	s, err := serial.OpenPort(c)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Opening")
 	}
 	for count := 0; count < 1000; count++ {
-		channel <- getAll(s)
+		channelResponse <- getAll(s)
 	}
-	close(channel)
+	close(channelResponse)
 	time.Sleep(time.Second * 3)
+	close(channelBatches)
+	defer println("LOL TEST")
 
 }
 
@@ -42,35 +46,24 @@ func getAll(s *serial.Port) [38]byte {
 	// Requête lire toutes les données
 	h, _ := hex.DecodeString("011e001F00")
 	_, err := s.Write(h)
-	if err != nil {
-		log.Fatal(err)
+	for err != nil {
+		_, err = s.Write(h)
+		time.Sleep(time.Second)
 	}
 	// Reads exactly 38 bytes
 	reader := bufio.NewReader(s)
 	reply, err := reader.Peek(38)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
+
 	var res [38]byte
 	copy(res[:], reply)
 	return res
 }
 
-func writeDB(channel chan [38]byte) {
-	// Create a new HTTPClient
-	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://localhost:8086",
-		Username:           os.Getenv("INFLUX_USER"),
-		Password:           os.Getenv("INFLUX_PSSWD"),
-		InsecureSkipVerify: true,
-	})
+func writeDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoints) {
 
-	if err != nil {
-		log.Fatal(err)
-	} else {
-		println("Connected :D")
-	}
-	defer c.Close() //ensure c is closed after function return
 	// Create a new point batch
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
 		Database:  myDB,
@@ -85,7 +78,7 @@ func writeDB(channel chan [38]byte) {
 	last := [38]byte{}
 	lastTime := time.Now()
 	count := 0
-	for response := range channel {
+	for response := range channelResponse {
 		if last == response {
 			lastTime = time.Now()
 		} else {
@@ -107,12 +100,9 @@ func writeDB(channel chan [38]byte) {
 			last = response
 			count++
 		}
-		if count == 200 {
+		if count == 20 {
 			// Write the batch
-			if err = c.Write(bp); err != nil {
-				log.Fatal(err)
-			}
-			log.Println("Sent the batch!")
+			channelBatches <- bp
 			bp, err = client.NewBatchPoints(client.BatchPointsConfig{
 				Database:  myDB,
 				Precision: "ms",
@@ -128,11 +118,32 @@ func writeDB(channel chan [38]byte) {
 		log.Fatal(errPt)
 	}
 	bp.AddPoint(pt)
-	// Write the batch
-	if err := c.Write(bp); err != nil {
+	channelBatches <- bp
+	close(channelBatches)
+}
+
+func sendDB(channelBatches chan client.BatchPoints) {
+	// Create a new HTTPClient
+	c, err := client.NewHTTPClient(client.HTTPConfig{
+		Addr:               "https://localhost:8086",
+		Username:           os.Getenv("INFLUX_USER"),
+		Password:           os.Getenv("INFLUX_PSSWD"),
+		InsecureSkipVerify: true,
+	})
+
+	if err != nil {
 		log.Fatal(err)
+	} else {
+		println("Connected :D")
 	}
-	log.Println("Sent the batch!")
+	defer c.Close() //ensure c is closed after function return
+	for batch := range channelBatches {
+		// Write the batch
+		if err := c.Write(batch); err != nil {
+			log.Fatal(err)
+		}
+		log.Println("Sent the batch!")
+	}
 }
 
 func nthBit(x byte, n uint) bool {
@@ -189,8 +200,8 @@ func actuatorInfo(response [38]byte) map[string]interface{} {
 		"indication4":       nthBit(response[10], 3),
 		"indication5":       nthBit(response[10], 4),
 		"valveJammed":       nthBit(response[10], 5),
-		"Auxiliary24VFault": nthBit(response[10], 6),
-		"TooManyStarts":     nthBit(response[10], 7),
+		"auxiliary24VFault": nthBit(response[10], 6),
+		"tooManyStarts":     nthBit(response[10], 7),
 
 		"pumping":              nthBit(response[11], 0),
 		"confMemFault":         nthBit(response[11], 1),
