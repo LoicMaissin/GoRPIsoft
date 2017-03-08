@@ -32,14 +32,11 @@ func main() {
 	if err != nil {
 		log.Fatal("Opening")
 	}
-	for count := 0; count < 1000; count++ {
+	for count := 0; count < 500; count++ {
 		channelResponse <- getAll(s)
 	}
 	close(channelResponse)
 	time.Sleep(time.Second * 3)
-	close(channelBatches)
-	defer println("LOL TEST")
-
 }
 
 func getAll(s *serial.Port) [38]byte {
@@ -54,6 +51,7 @@ func getAll(s *serial.Port) [38]byte {
 	reader := bufio.NewReader(s)
 	reply, err := reader.Peek(38)
 	if err != nil {
+		log.Println("Error reading buffer")
 		log.Fatal(err)
 	}
 
@@ -100,7 +98,7 @@ func writeDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 			last = response
 			count++
 		}
-		if count == 20 {
+		if count == 200 {
 			// Write the batch
 			channelBatches <- bp
 			bp, err = client.NewBatchPoints(client.BatchPointsConfig{
@@ -110,6 +108,7 @@ func writeDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 			if err != nil {
 				log.Fatal(err)
 			}
+			count = 0
 		}
 	}
 	fields := actuatorInfo(last)
@@ -119,10 +118,12 @@ func writeDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 	}
 	bp.AddPoint(pt)
 	channelBatches <- bp
+	time.Sleep(time.Second * 2)
+
 	close(channelBatches)
 }
 
-func sendDB(channelBatches chan client.BatchPoints) {
+func connectDB() client.Client {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://localhost:8086",
@@ -132,15 +133,26 @@ func sendDB(channelBatches chan client.BatchPoints) {
 	})
 
 	if err != nil {
+		log.Println("Error creating client")
 		log.Fatal(err)
 	} else {
-		println("Connected :D")
+		println("Created client")
 	}
+	return c
+}
+
+func sendDB(channelBatches chan client.BatchPoints) {
+	c := connectDB()
 	defer c.Close() //ensure c is closed after function return
 	for batch := range channelBatches {
 		// Write the batch
-		if err := c.Write(batch); err != nil {
-			log.Fatal(err)
+		err := c.Write(batch)
+		for err != nil {
+			log.Println("Error client.Write()")
+			log.Println(err)
+			time.Sleep(time.Second / 2)
+			c = connectDB()
+			err = c.Write(batch)
 		}
 		log.Println("Sent the batch!")
 	}
