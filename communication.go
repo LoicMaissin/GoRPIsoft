@@ -123,7 +123,7 @@ func writeDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 	close(channelBatches)
 }
 
-func connectDB() client.Client {
+func sendDB(channelBatches chan client.BatchPoints) {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
 		Addr:               "https://localhost:8086",
@@ -135,14 +135,7 @@ func connectDB() client.Client {
 	if err != nil {
 		log.Println("Error creating client")
 		log.Fatal(err)
-	} else {
-		println("Created client")
 	}
-	return c
-}
-
-func sendDB(channelBatches chan client.BatchPoints) {
-	c := connectDB()
 	defer c.Close() //ensure c is closed after function return
 	for batch := range channelBatches {
 		// Write the batch
@@ -151,7 +144,6 @@ func sendDB(channelBatches chan client.BatchPoints) {
 			log.Println("Error client.Write()")
 			log.Println(err)
 			time.Sleep(time.Second / 2)
-			c = connectDB()
 			err = c.Write(batch)
 		}
 		log.Println("Sent the batch!")
