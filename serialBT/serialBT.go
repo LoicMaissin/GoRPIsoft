@@ -22,9 +22,12 @@ func initSerial() *serial.Port {
 		Baud:        115200,
 		ReadTimeout: time.Second * 5}
 	s, err := serial.OpenPort(c)
-	if err != nil {
-		log.Fatal("Opening")
+	for err != nil {
+		log.Println("Opening")
+		time.Sleep(time.Second * 30)
+		s, err = serial.OpenPort(c)
 	}
+	log.Println("Connected")
 	return s
 }
 
@@ -34,16 +37,24 @@ var port = initSerial()
 func GetAll() [38]byte {
 	// Requests for all the data
 	h, _ := hex.DecodeString("011e001F00")
-	_, err := port.Write(h)
-	if err != nil {
-		log.Println(err)
+	_, errWrite := port.Write(h)
+	if errWrite != nil {
+		log.Println(errWrite)
 	}
 	// Reads exactly 38 bytes
 	reader := bufio.NewReader(port)
 	reply, err := reader.Peek(38)
-	if err != nil {
+	for err != nil {
 		log.Println("Error reading buffer")
-		log.Fatal(err)
+		port.Close()
+		time.Sleep(time.Second * 30)
+		port = initSerial()
+		reader = bufio.NewReader(port)
+		_, errWrite = port.Write(h)
+		if errWrite != nil {
+			log.Println(errWrite)
+		}
+		reply, err = reader.Peek(38)
 	}
 	var res [38]byte
 	copy(res[:], reply)
