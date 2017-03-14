@@ -82,7 +82,7 @@ func ActuatorInfo(response [38]byte) map[string]interface{} {
 		"totalRunningTime":      addBytes(response[22:26]),
 		"partialStarts":         addBytes(response[26:30]),
 		"partialRunningTime":    addBytes(response[30:34]),
-		"actPosition(per mil)":  addBytes(response[34:36]),
+		"actPositionPerMil":     addBytes(response[34:36]),
 	}
 	return fields
 }

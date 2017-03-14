@@ -13,7 +13,12 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 )
 
+// Variables for the database and tags
 const myDB = "test"
+
+var serialNumber = os.Getenv("SERIALNB")
+var importance = os.Getenv("IMPORTANCE")
+var location = os.Getenv("LOCATION")
 
 // WriteDB Creates batches of points from the actuator responses
 func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoints) {
@@ -27,7 +32,7 @@ func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 	}
 
 	// Create a point and add to batch
-	tags := map[string]string{"actuator": "0"}
+	tags := map[string]string{"actuator": serialNumber, "location": location, "importance": importance}
 	last := [38]byte{}
 	lastTime := time.Now()
 	count := 0
