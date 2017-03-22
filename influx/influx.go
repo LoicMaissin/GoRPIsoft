@@ -6,6 +6,7 @@ package influx
 
 import (
 	"GoRPIsoft/analyser"
+	"bufio"
 	"log"
 	"os"
 	"time"
@@ -13,18 +14,35 @@ import (
 	"github.com/influxdata/influxdb/client/v2"
 )
 
-// Variables for the database and tags
-const myDB = "test"
+var factory, importance, area, serialNumber, tagNumber, model, name = getConfig()
 
-var serialNumber = os.Getenv("SERIALNB")
-var importance = os.Getenv("IMPORTANCE")
-var location = os.Getenv("LOCATION")
+var database = "measures"
+
+// Read the configuration file
+func getConfig() (string, string, string, string, string, string, string) {
+	file, err := os.Open("/etc/actSoft/conf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+	a := []string{}
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		a = append(a, scanner.Text())
+		//fmt.Println(scanner.Text())
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+	return a[0], a[1], a[2], a[3], a[4], a[5], a[6]
+}
 
 // WriteDB Creates batches of points from the actuator responses
 func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoints) {
 	// Create a new point batch
 	bp, err := client.NewBatchPoints(client.BatchPointsConfig{
-		Database:  myDB,
+		Database:  database,
 		Precision: "ms",
 	})
 	if err != nil {
@@ -32,7 +50,7 @@ func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 	}
 
 	// Create a point and add to batch
-	tags := map[string]string{"actuator": serialNumber, "location": location, "importance": importance}
+	tags := map[string]string{"serialNumber": serialNumber, "area": area, "importance": importance, "actuatorFactory": factory, "model": model, "valveTag": tagNumber, "name": name}
 	last := [38]byte{}
 	lastTime := time.Now()
 	count := 0
@@ -62,7 +80,7 @@ func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 			// Write the batch
 			channelBatches <- bp
 			bp, err = client.NewBatchPoints(client.BatchPointsConfig{
-				Database:  myDB,
+				Database:  database,
 				Precision: "ms",
 			})
 			if err != nil {

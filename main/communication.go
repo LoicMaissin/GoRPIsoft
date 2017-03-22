@@ -18,7 +18,7 @@ func main() {
 	go influx.WriteDB(channelResponse, channelBatches)
 	go influx.SendDB(channelBatches)
 
-	for count := 0; count < 11500; count++ {
+	for {
 		channelResponse <- serialBT.GetAll()
 	}
 	close(channelResponse)
