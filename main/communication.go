@@ -20,6 +20,7 @@ func main() {
 
 	for {
 		channelResponse <- serialBT.GetAll()
+		// You can use a time.Sleep() here to slow down the requests.
 	}
 	close(channelResponse)
 	time.Sleep(time.Second * 3)
