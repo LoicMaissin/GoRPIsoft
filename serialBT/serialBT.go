@@ -43,7 +43,7 @@ func GetAll() [38]byte {
 	}
 	// Reads exactly 38 bytes
 	reader := bufio.NewReader(port)
-	reply, err := reader.Peek(38)
+	reply, err := reader.Peek(37)
 	for err != nil {
 		log.Println("Error reading buffer")
 		port.Close()

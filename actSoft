@@ -9,7 +9,6 @@
 # Description:       Enable service provided by daemon.
 ### END INIT INFO
 
-#Modify these lines to select the service
 dir="/home/pi/go/src/GoRPIsoft"
 cmd="/usr/local/go/bin/go run ./main/communication.go"
 user="pi"
@@ -97,3 +96,4 @@ case "$1" in
 esac
 
 exit 0
+

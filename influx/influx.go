@@ -50,7 +50,7 @@ func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 	}
 
 	// Create a point and add to batch
-	tags := map[string]string{"serialNumber": serialNumber, "area": area, "importance": importance, "actuatorFactory": factory, "model": model, "valveTag": tagNumber, "name": name}
+	tags := map[string]string{"serialNumber": serialNumber, "area": area, "importance": importance, "actFactory": factory, "model": model, "valveTag": tagNumber, "actName": name}
 	last := [38]byte{}
 	lastTime := time.Now()
 	count := 0
@@ -105,9 +105,9 @@ func WriteDB(channelResponse chan [38]byte, channelBatches chan client.BatchPoin
 func SendDB(channelBatches chan client.BatchPoints) {
 	// Create a new HTTPClient
 	c, err := client.NewHTTPClient(client.HTTPConfig{
-		Addr:               "https://localhost:8086",
-		Username:           os.Getenv("INFLUX_USER"),
-		Password:           os.Getenv("INFLUX_PSSWD"),
+		Addr:               "http://localhost:8087",
+		Username:           "bernard",
+		Password:           "bernardcontrols",
 		InsecureSkipVerify: true,
 	})
 
